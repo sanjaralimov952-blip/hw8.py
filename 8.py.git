@@ -1,0 +1,177 @@
+import sqlite3
+
+
+# Подключение к базе данных
+def get_connection():
+    return sqlite3.connect("shop.db")
+
+
+# Создание таблиц
+def create_tables():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER,
+        product TEXT,
+        price REAL,
+        FOREIGN KEY (customer_id) REFERENCES customers(id)
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# Добавление клиента
+def add_customer(name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO customers (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+
+
+# Добавление заказа
+def add_order(customer_id, product, price):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO orders (customer_id, product, price) VALUES (?, ?, ?)",
+        (customer_id, product, price)
+    )
+    conn.commit()
+    conn.close()
+
+
+# JOIN запрос
+def show_customers_orders():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT customers.name, orders.product, orders.price
+    FROM customers
+    LEFT JOIN orders ON customers.id = orders.customer_id
+    """)
+
+    rows = cursor.fetchall()
+    print("\n📖 Customers and their orders:")
+    for row in rows:
+        print(row)
+
+    conn.close()
+
+
+# Агрегатные функции
+def aggregate_functions():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM orders")
+    print("\nTotal orders:", cursor.fetchone()[0])
+
+    cursor.execute("SELECT MAX(price) FROM orders")
+    print("Max price:", cursor.fetchone()[0])
+
+    cursor.execute("SELECT AVG(price) FROM orders")
+    print("Average price:", cursor.fetchone()[0])
+
+    conn.close()
+
+
+# GROUP BY
+def orders_count_per_customer():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT customers.name, COUNT(orders.id)
+    FROM customers
+    LEFT JOIN orders ON customers.id = orders.customer_id
+    GROUP BY customers.name
+    """)
+
+    print("\n📊 Orders per customer:")
+    for row in cursor.fetchall():
+        print(row)
+
+    conn.close()
+
+
+# SUBQUERY
+def customers_with_expensive_orders():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT name FROM customers
+    WHERE id IN (
+        SELECT customer_id FROM orders WHERE price > 100
+    )
+    """)
+
+    print("\n👀 Customers with expensive orders (>100):")
+    for row in cursor.fetchall():
+        print(row[0])
+
+    conn.close()
+
+
+# VIEW
+def create_view():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE VIEW IF NOT EXISTS customer_orders_view AS
+    SELECT customers.name, orders.product, orders.price
+    FROM customers
+    JOIN orders ON customers.id = orders.customer_id
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def show_view():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM customer_orders_view")
+    print("\n👁 Data from VIEW:")
+    for row in cursor.fetchall():
+        print(row)
+
+    conn.close()
+
+
+# Тестирование
+if __name__ == "__main__":
+    create_tables()
+
+    add_customer("Ali")
+    add_customer("Amina")
+    add_customer("Sanjar")
+
+    add_order(1, "Laptop", 1200)
+    add_order(1, "Mouse", 20)
+    add_order(2, "Phone", 500)
+    add_order(3, "Book", 15)
+
+    show_customers_orders()
+    aggregate_functions()
+    orders_count_per_customer()
+    customers_with_expensive_orders()
+
+    create_view()
+    show_view()
